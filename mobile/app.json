@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Greenhill Hornets Scheduler",
+    "slug": "greenhill-hornets-scheduler",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1a5e1a",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.greenhill.hornets.scheduler",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos and videos of games",
+        "NSPhotoLibraryUsageDescription": "Upload photos and videos from your library",
+        "NSMicrophoneUsageDescription": "Record video with audio for game footage"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a5e1a"
+      },
+      "package": "org.greenhill.hornets.scheduler",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-image-picker",
+      "expo-media-library",
+      "expo-notifications",
+      "expo-secure-store",
+      "expo-router"
+    ],
+    "scheme": "greenhill-hornets"
+  }
+}

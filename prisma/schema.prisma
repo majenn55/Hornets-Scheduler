@@ -1,0 +1,548 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Authentication & User Management
+// ============================================================
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  passwordHash   String
+  firstName      String
+  lastName       String
+  phone          String?
+  avatarUrl      String?
+  role           GlobalRole @default(USER)
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Auth relations
+  sessions       Session[]
+  accounts       Account[]
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+
+  // Family relations
+  familyMemberships FamilyMember[]
+  familyInvitesSent FamilyInvite[] @relation("FamilyInviteSender")
+
+  // Team/League relations
+  teamMemberships  TeamMember[]
+  leagueMemberships LeagueMember[]
+
+  // Invites
+  invitesSent    Invite[] @relation("InviteSender")
+  invitesReceived Invite[] @relation("InviteRecipient")
+
+  // Media
+  mediaUploads   Media[]
+
+  // Streaming
+  streams        LiveStream[]
+
+  // Notifications
+  notifications  Notification[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  resource  String
+  resourceId String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
+}
+
+// ============================================================
+// Family & Linked Accounts
+// ============================================================
+
+model Family {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   FamilyMember[]
+  invites   FamilyInvite[]
+}
+
+model FamilyMember {
+  id       String     @id @default(cuid())
+  familyId String
+  userId   String
+  role     FamilyRole @default(MEMBER)
+  joinedAt DateTime   @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+}
+
+model FamilyInvite {
+  id          String       @id @default(cuid())
+  familyId    String
+  invitedBy   String
+  email       String
+  token       String       @unique
+  status      InviteStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  expiresAt   DateTime
+
+  family  Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  sender  User   @relation("FamilyInviteSender", fields: [invitedBy], references: [id])
+
+  @@index([token])
+  @@index([email])
+}
+
+// ============================================================
+// Leagues
+// ============================================================
+
+model League {
+  id          String    @id @default(cuid())
+  name        String
+  sportType   SportType
+  description String?
+  location    String?
+  logoUrl     String?
+  isPublic    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  members  LeagueMember[]
+  seasons  Season[]
+  teams    Team[]
+  invites  Invite[]
+
+  @@index([sportType])
+}
+
+model LeagueMember {
+  id       String     @id @default(cuid())
+  leagueId String
+  userId   String
+  role     LeagueRole @default(MEMBER)
+  joinedAt DateTime   @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+}
+
+// ============================================================
+// Teams & Rosters
+// ============================================================
+
+model Team {
+  id          String    @id @default(cuid())
+  name        String
+  sportType   SportType
+  leagueId    String?
+  logoUrl     String?
+  primaryColor String?
+  secondaryColor String?
+  location    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  league      League?      @relation(fields: [leagueId], references: [id], onDelete: SetNull)
+  members     TeamMember[]
+  rosters     Roster[]
+  homeGames   Game[]       @relation("HomeTeam")
+  awayGames   Game[]       @relation("AwayTeam")
+  invites     Invite[]
+  media       Media[]
+
+  @@index([leagueId])
+  @@index([sportType])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  role     TeamRole @default(PLAYER)
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model Roster {
+  id        String       @id @default(cuid())
+  teamId    String
+  seasonId  String?
+  name      String
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  team    Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  season  Season?       @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  players RosterPlayer[]
+
+  @@index([teamId])
+}
+
+model RosterPlayer {
+  id           String  @id @default(cuid())
+  rosterId     String
+  firstName    String
+  lastName     String
+  jerseyNumber String?
+  position     String?
+  dateOfBirth  DateTime?
+  heightInches Int?
+  weightLbs    Int?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+
+  roster Roster      @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  stats  PlayerStat[]
+
+  @@index([rosterId])
+}
+
+// ============================================================
+// Seasons & Scheduling
+// ============================================================
+
+model Season {
+  id        String       @id @default(cuid())
+  leagueId  String
+  name      String
+  sportType SportType
+  startDate DateTime
+  endDate   DateTime
+  status    SeasonStatus @default(UPCOMING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  league  League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  games   Game[]
+  rosters Roster[]
+
+  @@index([leagueId])
+  @@index([startDate, endDate])
+}
+
+model Game {
+  id          String     @id @default(cuid())
+  seasonId    String
+  homeTeamId  String
+  awayTeamId  String
+  sportType   SportType
+  scheduledAt DateTime
+  location    String?
+  fieldName   String?
+  status      GameStatus @default(SCHEDULED)
+  homeScore   Int?
+  awayScore   Int?
+  period      Int?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  season   Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  homeTeam Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  stats    PlayerStat[]
+  media    Media[]
+  streams  LiveStream[]
+
+  @@index([seasonId])
+  @@index([scheduledAt])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+// ============================================================
+// Sport-Specific Stats
+// ============================================================
+
+model PlayerStat {
+  id             String    @id @default(cuid())
+  gameId         String
+  rosterPlayerId String
+  sportType      SportType
+  statData       Json
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  game         Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  rosterPlayer RosterPlayer @relation(fields: [rosterPlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, rosterPlayerId])
+  @@index([gameId])
+  @@index([rosterPlayerId])
+}
+
+// ============================================================
+// Invites (League & Team)
+// ============================================================
+
+model Invite {
+  id          String       @id @default(cuid())
+  type        InviteType
+  leagueId    String?
+  teamId      String?
+  senderId    String
+  recipientId String?
+  email       String
+  token       String       @unique
+  role        String?
+  status      InviteStatus @default(PENDING)
+  message     String?
+  createdAt   DateTime     @default(now())
+  expiresAt   DateTime
+
+  league    League? @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team      Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sender    User    @relation("InviteSender", fields: [senderId], references: [id])
+  recipient User?   @relation("InviteRecipient", fields: [recipientId], references: [id])
+
+  @@index([token])
+  @@index([email])
+  @@index([status])
+}
+
+// ============================================================
+// Media (Photos & Videos)
+// ============================================================
+
+model Media {
+  id          String    @id @default(cuid())
+  uploaderId  String
+  teamId      String?
+  gameId      String?
+  type        MediaType
+  url         String
+  thumbnailUrl String?
+  fileName    String
+  fileSize    Int
+  mimeType    String
+  width       Int?
+  height      Int?
+  duration    Int?
+  caption     String?
+  createdAt   DateTime  @default(now())
+
+  uploader User  @relation(fields: [uploaderId], references: [id])
+  team     Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  game     Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([uploaderId])
+  @@index([teamId])
+  @@index([gameId])
+  @@index([type])
+}
+
+// ============================================================
+// Live Streaming
+// ============================================================
+
+model LiveStream {
+  id          String       @id @default(cuid())
+  gameId      String
+  startedBy   String
+  streamKey   String       @unique
+  title       String
+  status      StreamStatus @default(PENDING)
+  hlsUrl      String?
+  rtmpUrl     String?
+  viewerCount Int          @default(0)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime     @default(now())
+
+  game    Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  starter User @relation(fields: [startedBy], references: [id])
+
+  @@index([gameId])
+  @@index([streamKey])
+}
+
+// ============================================================
+// Notifications
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum GlobalRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum FamilyRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum LeagueRole {
+  COMMISSIONER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum TeamRole {
+  OWNER
+  COACH
+  ASSISTANT_COACH
+  PLAYER
+  PARENT
+  SCOREKEEPER
+}
+
+enum SportType {
+  SOCCER
+  SOFTBALL
+  BASKETBALL
+}
+
+enum SeasonStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum GameStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  POSTPONED
+  CANCELLED
+}
+
+enum InviteType {
+  LEAGUE
+  TEAM
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
+enum StreamStatus {
+  PENDING
+  LIVE
+  ENDED
+  ERROR
+}
+
+enum NotificationType {
+  INVITE
+  GAME_REMINDER
+  GAME_UPDATE
+  SCORE_UPDATE
+  TEAM_UPDATE
+  LEAGUE_UPDATE
+  FAMILY_INVITE
+  STREAM_STARTED
+  GENERAL
+}
