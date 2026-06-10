@@ -28,6 +28,9 @@ export default function HomePage() {
           </div>
         </div>
         <div className="flex gap-3">
+          <Link href="/demo" className="text-[#C5972C] hover:text-[#e4b53a] px-4 py-2 text-sm font-medium border border-[#C5972C]/40 rounded-lg">
+            Try Demo
+          </Link>
           <Link href="/auth/login" className="text-white/80 hover:text-white px-4 py-2 text-sm font-medium">
             Sign In
           </Link>
@@ -67,12 +70,12 @@ export default function HomePage() {
             Manage teams, schedule games, track stats, capture moments, and stream live -
             all in one place for soccer, softball, and basketball.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 flex-wrap">
             <Link href="/auth/register" className="bg-[#C5972C] text-white px-8 py-3 rounded-lg font-semibold text-lg hover:bg-[#e4b53a] transition-colors shadow-lg">
               Start Free
             </Link>
-            <Link href="/auth/login" className="border-2 border-[#C5972C]/60 text-[#C5972C] px-8 py-3 rounded-lg font-semibold text-lg hover:bg-[#C5972C]/10 transition-colors">
-              Sign In
+            <Link href="/demo" className="border-2 border-[#C5972C]/60 text-[#C5972C] px-8 py-3 rounded-lg font-semibold text-lg hover:bg-[#C5972C]/10 transition-colors">
+              Try Demo
             </Link>
           </div>
         </div>
